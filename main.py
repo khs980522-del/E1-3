@@ -9,7 +9,26 @@ REPEAT = 10      # 성능 측정 반복 횟수
 
 
 # ---------------------------------------------
-# [1단계] 핵심 부품
+# [1단계] 데이터 구조: n×n 2차원 배열
+# ---------------------------------------------
+
+def create_matrix(n):
+    """0.0으로 채운 n×n 2차원 리스트를 만든다."""
+    return [[0.0] * n for _ in range(n)]
+
+
+def set_value(matrix, i, j, value):
+    """matrix의 (i행, j열) 위치에 value를 저장한다."""
+    matrix[i][j] = value
+
+
+def get_value(matrix, i, j):
+    """matrix의 (i행, j열) 위치의 값을 읽어온다."""
+    return matrix[i][j]
+
+
+# ---------------------------------------------
+# [1단계] 핵심 부품: MAC 연산과 판정
 # ---------------------------------------------
 
 def mac(pattern, filter_):
@@ -18,6 +37,8 @@ def mac(pattern, filter_):
     total = 0.0
     for i in range(n):          # 행
         for j in range(n):      # 열
+            # get_value()와 같은 동작이지만, 수백 번 반복되는 곳이라
+            # 함수 호출 비용을 줄이려고 직접 인덱스로 읽는다.
             total += pattern[i][j] * filter_[i][j]
     return total
 
@@ -71,9 +92,9 @@ def read_matrix(title, n=3):
     """n줄을 입력받아 n×n 2차원 리스트로 돌려준다. 형식이 틀리면 처음부터 다시 받는다."""
     while True:
         print(f"{title} ({n}줄 입력, 공백 구분)")
-        matrix = []
+        matrix = create_matrix(n)
         ok = True
-        for _ in range(n):
+        for i in range(n):
             parts = input().split()
             # 검증 1: 한 줄에 숫자가 n개인지
             if len(parts) != n:
@@ -85,7 +106,8 @@ def read_matrix(title, n=3):
             except ValueError:
                 ok = False
                 break
-            matrix.append(row)
+            for j in range(n):
+                set_value(matrix, i, j, row[j])   # (i, j) 위치에 저장
 
         if ok:
             return matrix
@@ -136,6 +158,10 @@ def run_mode1():
         print(f"판정: 판정 불가 (|A-B| < {EPSILON})")
     else:
         print(f"판정: {result}")
+
+    # 사용자가 입력한 패턴과 필터 그대로 측정한 3x3 성능
+    print_section(f"[4] 성능 분석 (평균/{REPEAT}회)")
+    print_perf_table([(3, avg_ms)])
 
 
 # ---------------------------------------------
@@ -302,12 +328,19 @@ def make_x(n):
 
 def print_performance(sizes):
     """크기별로 MAC 평균 시간과 연산 횟수(N²)를 표로 출력한다."""
-    print(f"{'크기':<8}{'평균 시간(ms)':>14}{'연산 횟수(N²)':>14}")
-    print("-" * 40)
+    rows = []
     for n in sizes:
         pattern = make_cross(n)   # 측정용 입력은 자동 생성 (같은 조건으로 비교하기 위해)
         filter_ = make_x(n)
-        avg_ms = measure_mac_time(pattern, filter_)
+        rows.append((n, measure_mac_time(pattern, filter_)))
+    print_perf_table(rows)
+
+
+def print_perf_table(rows):
+    """(크기 N, 평균 시간 ms) 목록을 "크기 / 평균 시간 / 연산 횟수(N²)" 표로 출력한다."""
+    print(f"{'크기':<8}{'평균 시간(ms)':>14}{'연산 횟수(N²)':>14}")
+    print("-" * 40)
+    for n, avg_ms in rows:
         print(f"{f'{n}x{n}':<8}{avg_ms:>14.4f}{n * n:>14}")
 
 
@@ -358,8 +391,12 @@ def print_optimization_compare(sizes):
 
 def print_matrix(matrix):
     """행렬을 ■ □ 모양으로 보여준다. (0이 아니면 ■)"""
-    for row in matrix:
-        print(" ".join("■" if v != 0 else "□" for v in row))
+    n = len(matrix)
+    for i in range(n):
+        cells = []
+        for j in range(n):
+            cells.append("■" if get_value(matrix, i, j) != 0 else "□")   # (i, j) 위치를 읽음
+        print(" ".join(cells))
 
 
 def read_size():
